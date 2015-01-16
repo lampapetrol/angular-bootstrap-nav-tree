@@ -39,6 +39,7 @@ But there are other attributes to customize the tree:
         icon-leaf         = "icon-file"
         icon-expand       = "icon-plus-sign"
         icon-collapse     = "icon-minus-sign"
+        child-field       = "children"
         on-select         = "my_tree_handler(branch)"
         expand-level      = "2"
         initial-selection = "Vegetable">      
