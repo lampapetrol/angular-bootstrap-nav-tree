@@ -1,4 +1,3 @@
-
 module = angular.module 'angularBootstrapNavTree',[]
 
 module.directive 'abnTree',['$timeout',($timeout)-> 
@@ -8,12 +7,7 @@ module.directive 'abnTree',['$timeout',($timeout)->
 
   template: """
 <ul class="nav nav-list nav-pills nav-stacked abn-tree">
-  <li ng-repeat="row in tree_rows | filter:{visible:true} track by row.branch.uid" ng-animate="'abn-tree-animate'" ng-class="'level-' + {{ row.level }} + (row.branch.selected ? ' active':'')" class="abn-tree-row">
-    <a ng-click="user_clicks_branch(row.branch)">
-      <i ng-class="row.tree_icon" ng-click="row.branch.expanded = !row.branch.expanded" class="indented tree-icon"> </i>
-      <span class="indented tree-label">{{ row.label }} </span>
-    </a>
-  </li>
+  <li ng-repeat="row in tree_rows | filter:{visible:true} track by row.branch.uid" ng-animate="'abn-tree-animate'" ng-class="'level-' + {{ row.level }} + (row.branch.selected ? ' active':'') + ' ' +row.classes.join(' ')" class="abn-tree-row"><a ng-click="user_clicks_branch(row.branch)"><i ng-class="row.tree_icon" ng-click="row.branch.expanded = !row.branch.expanded" class="indented tree-icon"> </i><span class="indented tree-label">{{ row.label }} </span></a></li>
 </ul>""" # will be replaced by Grunt, during build, with the actual Template HTML
   replace:true
   scope:
@@ -35,6 +29,8 @@ module.directive 'abnTree',['$timeout',($timeout)->
     attrs.iconExpand   ?= 'icon-plus  glyphicon glyphicon-plus  fa fa-plus'    
     attrs.iconCollapse ?= 'icon-minus glyphicon glyphicon-minus fa fa-minus'
     attrs.iconLeaf     ?= 'icon-file  glyphicon glyphicon-file  fa fa-file'
+    attrs.childField   ?= 'children'
+    attrs.labelFn      ?= (node)-> node.label
 
     attrs.expandLevel  ?= '3'
 
@@ -46,7 +42,7 @@ module.directive 'abnTree',['$timeout',($timeout)->
       return
 
     if !scope.treeData.length?
-      if treeData.label?
+      if attrs.labelFn(treeData)?
         scope.treeData = [ treeData ]
       else
         alert 'treeData should be an array of root branches'
@@ -59,8 +55,8 @@ module.directive 'abnTree',['$timeout',($timeout)->
     for_each_branch = (f)->      
       do_f = (branch,level)->
         f(branch,level)
-        if branch.children?
-          for child in branch.children
+        if branch[attrs.childField]?
+          for child in branch[attrs.childField]
             do_f(child,level + 1)
       for root_branch in scope.treeData
         do_f(root_branch,1)
@@ -152,6 +148,26 @@ module.directive 'abnTree',['$timeout',($timeout)->
     on_treeData_change = ->
 
       #console.log 'tree-data-change!'
+      
+      #
+      # if "children" is just a list of strings...
+      # ...change them into objects:
+      # 
+      for_each_branch (branch)->
+        if branch[attrs.childField]
+          if branch[attrs.childField].length > 0
+            # don't use Array.map ( old browsers don't have it )
+            f = (e)->
+              if typeof e == 'string'
+                label:e
+                children:[]
+              else
+                e
+            branch[attrs.childField] = ( f(child) for child in branch[attrs.childField] )
+
+        else
+          branch[attrs.childField] = []
+
 
       # give each Branch a UID ( to keep AngularJS happy )
       for_each_branch (b,level)->
@@ -162,31 +178,12 @@ module.directive 'abnTree',['$timeout',($timeout)->
 
       # set all parents:
       for_each_branch (b)->
-        if angular.isArray b.children
-          for child in b.children
+        if angular.isArray b[attrs.childField]
+          for child in b[attrs.childField]
             child.parent_uid = b.uid
 
 
       scope.tree_rows = []
-
-      #
-      # if "children" is just a list of strings...
-      # ...change them into objects:
-      # 
-      for_each_branch (branch)->
-        if branch.children
-          if branch.children.length > 0
-            # don't use Array.map ( old browsers don't have it )
-            f = (e)->
-              if typeof e == 'string'
-                label:e
-                children:[]
-              else
-                e
-            branch.children = ( f(child) for child in branch.children )
-
-        else
-          branch.children = []
 
       
       #
@@ -198,13 +195,17 @@ module.directive 'abnTree',['$timeout',($timeout)->
         if not branch.expanded?
           branch.expanded = false
 
+        if not branch.classes?
+          branch.classes = []
+
         #
         # icons can be Bootstrap or Font-Awesome icons:
         # they will be rendered like:
         # <i class="icon-plus"></i>
         #
-        if not branch.children or branch.children.length == 0 
+        if not branch.noLeaf and (not branch[attrs.childField] or branch[attrs.childField].length == 0)
           tree_icon = attrs.iconLeaf
+          branch.classes.push "leaf" if "leaf" not in branch.classes
         else
           if branch.expanded
             tree_icon = attrs.iconCollapse
@@ -218,15 +219,16 @@ module.directive 'abnTree',['$timeout',($timeout)->
         scope.tree_rows.push
           level     : level
           branch    : branch
-          label     : branch.label
+          label     : attrs.labelFn(branch)
+          classes   : branch.classes
           tree_icon : tree_icon
           visible   : visible
 
         #
         # recursively add all children of this branch...( at Level+1 )
         #
-        if branch.children?
-          for child in branch.children
+        if branch[attrs.childField]?
+          for child in branch[attrs.childField]
             #
             # all branches are added to the list,
             #  but some are not visible
@@ -256,7 +258,7 @@ module.directive 'abnTree',['$timeout',($timeout)->
     #
     if attrs.initialSelection?
       for_each_branch (b)->
-        if b.label == attrs.initialSelection
+        if attrs.labelFn(b) == attrs.initialSelection
           $timeout ->
             select_branch b
 
@@ -310,7 +312,7 @@ module.directive 'abnTree',['$timeout',($timeout)->
           b
 
         tree.get_children = (b)->
-          b.children
+          b[attrs.childField]
 
         tree.select_parent_branch = (b)->
           if not b?
@@ -324,7 +326,7 @@ module.directive 'abnTree',['$timeout',($timeout)->
 
         tree.add_branch = (parent,new_branch)->
           if parent?
-            parent.children.push new_branch
+            parent[attrs.childField].push new_branch
             parent.expanded = true
           else
             scope.treeData.push new_branch
@@ -354,7 +356,7 @@ module.directive 'abnTree',['$timeout',($timeout)->
           if b?
             p = tree.get_parent_branch(b)
             if p
-              siblings = p.children
+              siblings = p[attrs.childField]
             else
               siblings = scope.treeData # the root branches
             return siblings
@@ -398,8 +400,8 @@ module.directive 'abnTree',['$timeout',($timeout)->
         tree.get_first_child = (b)->
           b ?= selected_branch
           if b?
-            if b.children?.length > 0
-              return b.children[0]
+            if b[attrs.childField]?.length > 0
+              return b[attrs.childField][0]
 
 
         tree.get_closest_ancestor_next_sibling = (b)->
@@ -444,11 +446,11 @@ module.directive 'abnTree',['$timeout',($timeout)->
         tree.last_descendant = (b)->
           if not b?
             debugger
-          n = b.children.length
+          n = b[attrs.childField].length
           if n == 0
             return b
           else
-            last_child = b.children[n-1]
+            last_child = b[attrs.childField][n-1]
             return tree.last_descendant(last_child)
 
 
