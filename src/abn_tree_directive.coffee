@@ -1,6 +1,6 @@
 module = angular.module 'angularBootstrapNavTree',[]
 
-module.directive 'abnTree',['$timeout',($timeout)-> 
+module.directive 'abnTree',['$timeout','$log',($timeout, $log)-> 
   restrict:'E'
   
   #templateUrl: '../dist/abn_tree_template.html' # <--- another way to do this
@@ -17,7 +17,7 @@ module.directive 'abnTree',['$timeout',($timeout)->
 
 
     error = (s) ->
-      console.log 'ERROR:'+s
+      $log.warn 'ERROR:'+s
       debugger
       return undefined
 
@@ -144,7 +144,7 @@ module.directive 'abnTree',['$timeout',($timeout)->
     scope.tree_rows = []
     on_treeData_change = ->
 
-      #console.log 'tree-data-change!'
+      #$log.debug 'tree-data-change!'
       
       #
       # if "children" is just a list of strings...
@@ -170,7 +170,7 @@ module.directive 'abnTree',['$timeout',($timeout)->
       for_each_branch (b,level)->
         if not b.uid
           b.uid = ""+Math.random()
-      console.log 'UIDs are set.'
+      $log.debug 'UIDs are set.'
 
 
       # set all parents:
@@ -263,7 +263,7 @@ module.directive 'abnTree',['$timeout',($timeout)->
     # expand to the proper level
     #
     n = scope.treeData.length
-    console.log 'num root branches = '+n
+    $log.debug 'num root branches = '+n
     for_each_branch (b,level)->
       b.level = level
       b.expanded = b.level < expand_level
